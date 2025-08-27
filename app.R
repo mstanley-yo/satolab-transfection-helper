@@ -1,0 +1,202 @@
+# satolab-transfection-helper
+# Load R packages
+library(shiny)
+library(bslib)
+library(shinythemes)
+library(tidyverse)
+library(flextable)
+
+# Define UI
+ui <- fluidPage(theme = shinytheme("cerulean"),
+  navbarPage("Transfection calculator",
+    tabPanel("Calculator",
+             sidebarPanel(
+               
+               # input names and concentrations
+               textInput("sample_name_input", "Sample name", value = ""),
+               numericInput("spike_input", "Spike concentration (ng/µl)", value = NA, min = 0),
+               numericInput("hibit_input", "HiBiT concentration (ng/µl)", value = NA, min = 0),
+               numericInput("luc2_input", "Luc2 concentration (ng/µl)", value = NA, min = 0),
+               
+               # select what type of well to transfect, and how many.
+               layout_columns(
+                 radioButtons( 
+                   "plate_input", 
+                   "Plate/Dish type", 
+                   list("6-well (2 mL)" = 2, "12-well (1 mL)" = 1, "15 cm (20 mL)" = 20) 
+                 ),
+                 numericInput("num_to_transfect_input", "Number to transfect", value = NA, min = 0)
+               ),
+               br(),
+               
+               # submit sample
+               actionButton("add_sample", "Add Sample"),
+               br(), br(),
+               actionButton("remove_all_samples", "Remove All Samples")
+               
+             ), # sidebarPanel
+             mainPanel(
+               tableOutput("sample_table"),
+               br(),
+               p(HTML("INFO:<br>
+                 Mass of DNA required for transfection is 1 µg per mL of medium.<br>
+                 For pseudoviruses, the DNA mix is 40% HiBiT, 40% Luc2, and 20% S."))
+             ) # mainPanel
+             
+    ), # Navbar, tabPanel2
+    tabPanel("Pretty output",
+             mainPanel(
+             uiOutput("pretty_output")
+             )
+    ), # Navbar, tabPanel3
+    
+    tabPanel("About",
+             mainPanel(
+               h3("About this website"),
+               p("Written in R Shiny by Maximilian Stanley Yo."),
+               p(
+                 "Follow development here: ",
+                 tags$a("GitHub Repository", href = "https://github.com/mstanley-yo/satolab-transfection-helper", target = "_blank")
+               )
+             )
+    ) # Navbar, tabPanel4
+    
+  ) # navbarPage
+) # fluidPage
+
+  
+# Define server function  
+server <- function(input, output) {
+
+  # Function to validate inputs
+  validateInputs <- function() {
+    validate(
+      need(input$sample_name_input != "", "Please enter a sample name."),
+      need(!is.na(input$spike_input), "Please enter Spike concentration."),
+      need(!is.na(input$hibit_input), "Please enter HiBiT concentration."),
+      need(!is.na(input$luc2_input), "Please enter Luc2 concentration."),
+      need(!is.na(input$num_to_transfect_input), "Please enter the number of plates to transfect.")
+    )
+  }
+  
+  # Set up dynamic sample table
+  sample_data <- reactiveVal(data.frame(sample_id = character(),
+                                        volume_spike = numeric(),
+                                        volume_hibit = numeric(),
+                                        volume_luc2 = numeric(),
+                                        volume_optimem = numeric(),
+                                        volume_transit = numeric()))
+  
+  observeEvent(input$add_sample, {
+    
+    # validate that all inputs are present
+    validateInputs()
+    
+    # calculate volumes based on input
+    # Total cell medium volume based on plate type and number of wells/dishes
+    volume_cell_medium <- as.numeric(input$plate_input) * as.numeric(input$num_to_transfect_input)
+    
+    # Calculate reagent volumes to add (µL) based on desired mass and user-provided concentrations
+    volume_spike_calc <- (200 * volume_cell_medium) / as.numeric(input$spike_input) # Spike: desired mass / concentration
+    volume_hibit_calc <- (400 * volume_cell_medium) / as.numeric(input$hibit_input) # HiBiT
+    volume_luc2_calc <-  (400 * volume_cell_medium) / as.numeric(input$luc2_input) # Luc2
+    
+    # Transfection reagents (converted from mL into uL)
+    volume_optimem_calc <- volume_cell_medium * 100
+    volume_transit_calc <- volume_cell_medium * 3
+    
+    # consolidate into new row
+    new_row <- data.frame(
+      sample_id = input$sample_name_input,
+      volume_spike = volume_spike_calc,
+      volume_hibit = volume_hibit_calc,
+      volume_luc2 = volume_luc2_calc,
+      volume_optimem = volume_optimem_calc,
+      volume_transit = volume_transit_calc
+    )
+    
+    # bind to current
+    current <- sample_data()
+    sample_data(rbind(current, new_row))
+  
+  }) # observeEvent - add_sample
+  
+  observeEvent(input$remove_all_samples, {
+    
+    sample_data(data.frame(sample_id = character(),
+                           volume_spike = numeric(),
+                           volume_hibit = numeric(),
+                           volume_luc2 = numeric(),
+                           volume_optimem = numeric(),
+                           volume_transit = numeric()
+
+    ))
+  }) # observeEvent - remove_all_samples
+  
+  output$sample_table <- renderTable({
+    
+    # validate that all inputs are present
+    validateInputs()
+    
+    # rename column headers and render table
+    sample_data() %>%
+      rename(
+        Sample = sample_id,
+        `S plasmid volume (µL)` = volume_spike,
+        `HiBiT plasmid volume (µL)` = volume_hibit,
+        `Luc2 plasmid volume (µL)` = volume_luc2,
+        `Add OptiMEM (µL) `= volume_optimem,
+        `Add TransIT (µL)` = volume_transit
+      )
+
+  }) # renderTable
+  
+  output$pretty_output <- renderUI({
+    
+    # validate that all inputs are present
+    validateInputs()
+    
+    # Get current data for display
+    df <- sample_data() %>%
+      mutate(across(where(is.numeric), function(x) round(x, 2))) %>%
+      rename(
+        Sample = sample_id,
+        `S plasmid volume (µL)` = volume_spike,
+        `HiBiT plasmid volume (µL)` = volume_hibit,
+        `Luc2 plasmid volume (µL)` = volume_luc2,
+        `Add OptiMEM (µL) `= volume_optimem,
+        `Add TransIT (µL)` = volume_transit
+      )
+    
+    # Build flextable
+    ft <- flextable(df) %>%
+      autofit() %>%
+      add_footer_lines(
+        values = as_paragraph(
+          "Protocol:\n",
+          "1. Add calculated volumes of DNA to a sterile tube.\n",
+          "2. Add calculated volume of Opti-Mem.\n",
+          "3. Add calculated volume of Trans-IT.\n",
+          "4. Incubate samples for 15 minutes at room temperature.\n",
+          "5. Add samples to cell medium at 10% v/v. For example, add 200 µL to each 2 mL well."
+        )
+      ) %>%
+      bold(bold = TRUE, part = "header") %>%
+      bold(j = 2:4, bold = TRUE, part = "body") %>%
+      color(j = 2:4, color = "red", part = "body") %>%
+      align(align = "center", part = "header") %>%
+      align(align = "center", part = "body") %>%
+      fontsize(size = 16, part = "all") 
+    
+    
+    # Render as HTML widget
+    tagList(
+      h3(paste0("Transfection protocol (", Sys.Date(), ")")),
+      flextable::htmltools_value(ft)
+    )
+  })
+  
+} #server
+
+# Create Shiny object
+shinyApp(ui = ui, server = server)
