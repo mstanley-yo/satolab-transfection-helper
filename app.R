@@ -11,12 +11,11 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
   navbarPage("Transfection calculator",
     tabPanel("Calculator",
              sidebarPanel(
-               
                # input names and concentrations
-               textInput("sample_name_input", "Sample name", value = ""),
-               numericInput("spike_input", "Spike concentration (ng/µl)", value = NA, min = 0),
-               numericInput("hibit_input", "HiBiT concentration (ng/µl)", value = NA, min = 0),
-               numericInput("luc2_input", "Luc2 concentration (ng/µl)", value = NA, min = 0),
+               textInput("sample_name_input", "Sample name", value = "test"),
+               numericInput("spike_input", "Spike concentration (ng/µl)", value = 500, min = 0), #test: 500
+               numericInput("hibit_input", "HiBiT concentration (ng/µl)", value = 953, min = 0), #test: 953
+               numericInput("luc2_input", "Luc2 concentration (ng/µl)", value = 920, min = 0), #test: 920
                
                # select what type of well to transfect, and how many.
                layout_columns(
@@ -25,7 +24,7 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                    "Plate/Dish type", 
                    list("6-well (2 mL)" = 2, "12-well (1 mL)" = 1, "15 cm (20 mL)" = 20) 
                  ),
-                 numericInput("num_to_transfect_input", "Number to transfect", value = NA, min = 0)
+                 numericInput("num_to_transfect_input", "Number to transfect", value = 3, min = 0) #test: 3
                ),
                br(),
                
@@ -46,7 +45,8 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
     ), # Navbar, tabPanel2
     tabPanel("Pretty output",
              mainPanel(
-             uiOutput("pretty_output")
+             uiOutput("pretty_output"),
+             downloadButton("download_docx", "Download table as .docx")
              )
     ), # Navbar, tabPanel3
     
@@ -87,13 +87,12 @@ server <- function(input, output) {
                                         volume_optimem = numeric(),
                                         volume_transit = numeric()))
   
+  # add sample 
   observeEvent(input$add_sample, {
-    
     # validate that all inputs are present
     validateInputs()
     
-    # calculate volumes based on input
-    # Total cell medium volume based on plate type and number of wells/dishes
+    # Calculate total cell medium volume based on plate type and number of wells/dishes
     volume_cell_medium <- as.numeric(input$plate_input) * as.numeric(input$num_to_transfect_input)
     
     # Calculate reagent volumes to add (µL) based on desired mass and user-provided concentrations
@@ -118,11 +117,10 @@ server <- function(input, output) {
     # bind to current
     current <- sample_data()
     sample_data(rbind(current, new_row))
-  
   }) # observeEvent - add_sample
   
   observeEvent(input$remove_all_samples, {
-    
+    # set sample_data to empty.
     sample_data(data.frame(sample_id = character(),
                            volume_spike = numeric(),
                            volume_hibit = numeric(),
@@ -133,31 +131,9 @@ server <- function(input, output) {
     ))
   }) # observeEvent - remove_all_samples
   
-  output$sample_table <- renderTable({
-    
-    # validate that all inputs are present
-    validateInputs()
-    
-    # rename column headers and render table
+  # reactive df for display and for creating flextable. Rename column headers and round values
+  df_display <- reactive({
     sample_data() %>%
-      rename(
-        Sample = sample_id,
-        `S plasmid volume (µL)` = volume_spike,
-        `HiBiT plasmid volume (µL)` = volume_hibit,
-        `Luc2 plasmid volume (µL)` = volume_luc2,
-        `Add OptiMEM (µL) `= volume_optimem,
-        `Add TransIT (µL)` = volume_transit
-      )
-
-  }) # renderTable
-  
-  output$pretty_output <- renderUI({
-    
-    # validate that all inputs are present
-    validateInputs()
-    
-    # Get current data for display
-    df <- sample_data() %>%
       mutate(across(where(is.numeric), function(x) round(x, 2))) %>%
       rename(
         Sample = sample_id,
@@ -167,9 +143,20 @@ server <- function(input, output) {
         `Add OptiMEM (µL) `= volume_optimem,
         `Add TransIT (µL)` = volume_transit
       )
+  })
+  
+  output$sample_table <- renderTable({
+    # validate that all inputs are present
+    validateInputs()
     
-    # Build flextable
-    ft <- flextable(df) %>%
+    # render table
+    df_display()
+  }) # renderTable
+  
+  #flextable reactive object.
+  ft <- reactive({
+    df_display() %>%
+      flextable() %>%
       autofit() %>%
       add_footer_lines(
         values = as_paragraph(
@@ -185,16 +172,34 @@ server <- function(input, output) {
       bold(j = 2:4, bold = TRUE, part = "body") %>%
       color(j = 2:4, color = "red", part = "body") %>%
       align(align = "center", part = "header") %>%
-      align(align = "center", part = "body") %>%
-      fontsize(size = 16, part = "all") 
+      align(align = "center", part = "body")
+      #fontsize(size = 14, part = "all") 
+  })
+  
+  output$pretty_output <- renderUI({
+    # validate that all inputs are present
+    validateInputs()
     
-    
-    # Render as HTML widget
+    # Render flextable as HTML widget
     tagList(
       h3(paste0("Transfection protocol (", Sys.Date(), ")")),
-      flextable::htmltools_value(ft)
+      flextable::htmltools_value(ft())
     )
   })
+  
+  # render flextable as .docx and make downloadable
+  output$download_docx <- downloadHandler(
+    filename = function() {
+      paste0("transfection_table_", Sys.Date(), ".docx")
+    },
+    content = function(file) {
+      ft_docx <- ft() %>%
+        width(width = dim(.)$widths*8 /(flextable_dim(.)$widths)) # format for docx.
+      
+      # Save as docx
+      flextable::save_as_docx(ft_docx, path = file)
+    }
+  )
   
 } #server
 
