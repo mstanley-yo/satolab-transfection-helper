@@ -5,7 +5,7 @@ account: mstanleyyo
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 15279420
-bundleId: 10824604
+bundleId: 10919415
 url: https://mstanleyyo.shinyapps.io/satolab-transfection-helper/
 version: 1
 asMultiple: FALSE
