@@ -5,6 +5,7 @@ library(bslib)
 library(shinythemes)
 library(tidyverse)
 library(flextable)
+library(officer)
 
 # Define UI
 ui <- fluidPage(
@@ -32,9 +33,9 @@ ui <- fluidPage(
         br(),
 
         # submit sample
-        actionButton("add_sample", "Add Sample"),
+        actionButton("add_sample", "Add Sample", icon = icon("plus")),
         br(), br(),
-        actionButton("remove_all_samples", "Remove All Samples")
+        actionButton("remove_all_samples", "Remove All Samples", icon = icon("trash"))
       ), # sidebarPanel
       mainPanel(
         tableOutput("sample_table"),
@@ -83,6 +84,7 @@ server <- function(input, output) {
   # Set up dynamic sample table
   sample_data <- reactiveVal(data.frame(
     sample_id = character(),
+    conc_spike = numeric(),
     volume_spike = numeric(),
     volume_hibit = numeric(),
     volume_luc2 = numeric(),
@@ -110,6 +112,7 @@ server <- function(input, output) {
     # consolidate into new row
     new_row <- data.frame(
       sample_id = input$sample_name_input,
+      conc_spike = input$spike_input,
       volume_spike = volume_spike_calc,
       volume_hibit = volume_hibit_calc,
       volume_luc2 = volume_luc2_calc,
@@ -122,10 +125,12 @@ server <- function(input, output) {
     sample_data(rbind(current, new_row))
   }) # observeEvent - add_sample
 
+  # remove all samples
   observeEvent(input$remove_all_samples, {
     # set sample_data to empty.
     sample_data(data.frame(
       sample_id = character(),
+      conc_spike = numeric(),
       volume_spike = numeric(),
       volume_hibit = numeric(),
       volume_luc2 = numeric(),
@@ -140,6 +145,7 @@ server <- function(input, output) {
       mutate(across(where(is.numeric), function(x) round(x, 2))) %>%
       rename(
         Sample = sample_id,
+        `S conc. (ng/µL)` = conc_spike,
         `S volume (µL)` = volume_spike,
         `HiBiT volume (µL)` = volume_hibit,
         `Luc2 volume (µL)` = volume_luc2,
@@ -149,11 +155,8 @@ server <- function(input, output) {
   })
 
   output$sample_table <- renderTable({
-    # validate that all inputs are present
-    validateInputs()
-
-    # render table
-    df_display()
+    validateInputs() # validate that all inputs are present
+    df_display() # render table
   }) # renderTable
 
   # flextable reactive object.
@@ -161,8 +164,14 @@ server <- function(input, output) {
     df_display() %>%
       flextable() %>%
       autofit() %>%
+      add_header_lines(
+        values = paste0("Pseudovirus transfection (", Sys.Date(), ") dilution table")
+      ) %>%
       add_footer_lines(
         values = as_paragraph(
+          paste0("HiBiT plasmid concentration: ", input$hibit_input, "ng/µL\n"),
+          paste0("Luc2 plasmid concentration: ", input$luc2_input, "ng/µL\n"),
+          "\n",
           "Protocol:\n",
           "1. Add calculated volumes of DNA to a sterile tube.\n",
           "2. Add calculated volume of Opti-Mem.\n",
@@ -172,11 +181,10 @@ server <- function(input, output) {
         )
       ) %>%
       bold(bold = TRUE, part = "header") %>%
-      bold(j = 2:4, bold = TRUE, part = "body") %>%
-      color(j = 2:4, color = "red", part = "body") %>%
+      bold(j = 3:5, bold = TRUE, part = "body") %>%
+      color(j = 3:5, color = "red", part = "body") %>%
       align(align = "center", part = "header") %>%
       align(align = "center", part = "body")
-    # fontsize(size = 14, part = "all")
   })
 
   output$pretty_output <- renderUI({
@@ -200,7 +208,16 @@ server <- function(input, output) {
         width(width = dim(.)$widths * 8 / (flextable_dim(.)$widths)) # format for docx.
 
       # Save as docx
-      flextable::save_as_docx(ft_docx, path = file)
+      sect_properties <- prop_section(
+        page_size = page_size(
+          orient = "landscape",
+          width = 7, height = 10
+        ),
+        type = "continuous",
+        page_margins = page_mar()
+      )
+        
+      flextable::save_as_docx(ft_docx, path = file, pr_section = sect_properties)
     }
   )
 } # server
