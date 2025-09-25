@@ -38,21 +38,15 @@ ui <- fluidPage(
         actionButton("remove_all_samples", "Remove All Samples", icon = icon("trash"))
       ), # sidebarPanel
       mainPanel(
-        tableOutput("sample_table"),
+        uiOutput("pretty_output"),
         br(),
         p(HTML("INFO:<br>
                  Mass of DNA required for transfection is 1 µg per mL of medium.<br>
-                 For pseudoviruses, the DNA mix is 40% HiBiT, 40% Luc2, and 20% S."))
-      ) # mainPanel
-    ), # Navbar, tabPanel2
-    tabPanel(
-      "Pretty output",
-      mainPanel(
-        uiOutput("pretty_output"),
+                 For pseudoviruses, the DNA mix is 40% HiBiT, 40% Luc2, and 20% S.")),
+        br(),
         downloadButton("download_docx", "Download table as .docx")
-      )
-    ), # Navbar, tabPanel3
-
+      ) # mainPanel
+    ), # Navbar, tabPanel Calculator
     tabPanel(
       "About",
       mainPanel(
@@ -63,7 +57,7 @@ ui <- fluidPage(
           tags$a("GitHub Repository", href = "https://github.com/mstanley-yo/satolab-transfection-helper", target = "_blank")
         )
       )
-    ) # Navbar, tabPanel4
+    ) # Navbar, tabPanel About
   ) # navbarPage
 ) # fluidPage
 
@@ -89,7 +83,8 @@ server <- function(input, output) {
     volume_hibit = numeric(),
     volume_luc2 = numeric(),
     volume_optimem = numeric(),
-    volume_transit = numeric()
+    volume_transit = numeric(),
+    volume_transfect = numeric() 
   ))
 
   # add sample
@@ -117,7 +112,8 @@ server <- function(input, output) {
       volume_hibit = volume_hibit_calc,
       volume_luc2 = volume_luc2_calc,
       volume_optimem = volume_optimem_calc,
-      volume_transit = volume_transit_calc
+      volume_transit = volume_transit_calc,
+      volume_transfect = volume_cell_medium
     )
 
     # bind to current
@@ -135,7 +131,8 @@ server <- function(input, output) {
       volume_hibit = numeric(),
       volume_luc2 = numeric(),
       volume_optimem = numeric(),
-      volume_transit = numeric()
+      volume_transit = numeric(),
+      volume_transfect = numeric()
     ))
   }) # observeEvent - remove_all_samples
 
@@ -150,7 +147,8 @@ server <- function(input, output) {
         `HiBiT volume (µL)` = volume_hibit,
         `Luc2 volume (µL)` = volume_luc2,
         `Add OptiMEM (µL) ` = volume_optimem,
-        `Add TransIT (µL)` = volume_transit
+        `Add TransIT (µL)` = volume_transit,
+        `Transfect to: (mL)` = volume_transfect
       )
   })
 
@@ -204,8 +202,9 @@ server <- function(input, output) {
       paste0("transfection_table_", Sys.Date(), ".docx")
     },
     content = function(file) {
+      ft_width <- 9 # increase to extend the width of the flextable
       ft_docx <- ft() %>%
-        width(width = dim(.)$widths * 8 / (flextable_dim(.)$widths)) # format for docx.
+        width(width = dim(.)$widths * ft_width / (flextable_dim(.)$widths)) # format for docx.
 
       # Save as docx
       sect_properties <- prop_section(
@@ -214,7 +213,9 @@ server <- function(input, output) {
           width = 7, height = 10
         ),
         type = "continuous",
-        page_margins = page_mar()
+        page_margins = page_mar(
+          top = 0.5, right = 0.5, bottom = 0.5, left = 0.5, header = 0.3, footer = 0.3, gutter = 0
+        )
       )
         
       flextable::save_as_docx(ft_docx, path = file, pr_section = sect_properties)
