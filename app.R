@@ -20,87 +20,95 @@ round_volumes <- function(vol) {
 }
 
 # ui function #####
-ui <- fluidPage(
-    theme = shinytheme("cerulean"),
-    navbarPage(
-        "Transfection calculator",
-        tabPanel(
-            "Calculator",
-            sidebarPanel(
-                # input names and concentrations
-                textInput(
-                    "sample_name_input",
-                    "Sample name", 
-                    value = NA
-                ),
-                numericInput(
-                    "spike_input", 
-                    "Spike concentration (ng/µl)", 
-                    value = NA, 
-                    min = 0
-                ),
-                numericInput(
-                    "hibit_input", 
-                    "HiBiT concentration (ng/µl)", 
-                    value = NA, 
-                    min = 0
-                ),
-                numericInput(
-                    "luc2_input", 
-                    "Luc2 concentration (ng/µl)", 
-                    value = NA, 
-                    min = 0
-                ),
-
-                # select what type of well to transfect, and how many.
-                layout_columns(
-                    radioButtons(
-                        "plate_input",
-                        "Plate/Dish type",
-                        list("6-well (2 mL)" = 2, 
-                                 "12-well (1 mL)" = 1, 
-                                 "15 cm (20 mL)" = 20)
+ui <- page_fluid(
+    # theme
+    theme = bs_theme(bootswatch = "flatly"),
+    
+    # title
+    tags$h3(
+        "Pseudovirus Transfection Calculator", 
+        class = "text-primary", 
+        style = "margin-top: 15px;margin-bottom: 15px;"
+    ),
+    
+    # sidebar layout
+    sidebarLayout(
+        sidebarPanel(
+            textInput(
+                "sample_name_input",
+                "Sample name", 
+                value = NA
+            ),
+            numericInput(
+                "spike_input", 
+                "Spike concentration (ng/µL)", 
+                value = NA, 
+                min = 0
+            ),
+            numericInput(
+                "hibit_input", 
+                "HiBiT concentration (ng/µL)", 
+                value = NA, 
+                min = 0
+            ),
+            numericInput(
+                "luc2_input", 
+                "Luc2 concentration (ng/µL)", 
+                value = NA, 
+                min = 0
+            ),
+            
+            layout_columns(
+                radioButtons(
+                    "plate_input",
+                    "Plate/Dish type",
+                    choices = list(
+                        "6-well (2 mL)" = 2, 
+                        "12-well (1 mL)" = 1, 
+                        "15 cm (20 mL)" = 20
                     ),
-                    numericInput(
-                        "num_to_transfect_input", 
-                        "Number to transfect", 
-                        value = NA, 
-                        min = 0
-                    )
+                    selected = 20
                 ),
-                br(),
-
-                # button to submit sample
-                actionButton(
-                    "add_sample", 
-                    "Add Sample", 
-                    icon = icon("plus")
-                ),
-                br(), 
-                br(),
-                
-                # button to remove all samples
-                actionButton(
-                    "remove_all_samples", 
-                    "Remove All Samples", 
-                    icon = icon("trash")
+                numericInput(
+                    "num_input", 
+                    "Number to transfect", 
+                    value = NA, 
+                    min = 0
                 )
             ),
-            mainPanel(
-                uiOutput("pretty_output"),
-                br(),
-                downloadButton("download_docx", "Download table as .docx"),
-                br(),
-                br(),
-                p("Written in R Shiny by Maximilian Stanley Yo."),
-                p(
-                    "Follow development here: ",
-                    tags$a(
-                        "GitHub Repository", 
-                        href = github_link,
-                        target = "_blank")
+            
+            br(),
+            actionButton(
+                "add_sample", 
+                "Add Sample", 
+                icon = icon("plus"),
+                class = "btn-primary"
+            ),
+            br(), 
+            br(),
+            actionButton(
+                "remove_all_samples", 
+                "Remove All Samples", 
+                icon = icon("trash"),
+                class = "btn-danger"
+            )
+        ),
+        
+        mainPanel(
+            uiOutput("pretty_output"),
+            br(),
+            downloadButton("download_docx", "Download table as .docx"),
+            br(),
+            br(),
+            p("Written in R Shiny by Maximilian Stanley Yo."),
+            p(
+                "Follow development here: ",
+                tags$a(
+                    "GitHub Repository", 
+                    href = github_link,
+                    target = "_blank"
                 )
-            ) 
+            )
         )
     )
 )
@@ -132,7 +140,7 @@ server <- function(input, output) {
                 "Please enter Luc2 concentration."
             ),
             need(
-                !is.na(input$num_to_transfect_input), 
+                !is.na(input$num_input), 
                 "Please enter the number of plates to transfect."
             )
         )
@@ -240,8 +248,7 @@ server <- function(input, output) {
         validate_inputs()
         
         # Calculate total cell medium volume
-        volume_cell_medium <- as.numeric(input$plate_input) * 
-            as.numeric(input$num_to_transfect_input)
+        volume_cell_medium <- as.numeric(input$plate_input) * input$num_input
         
         # Calculate reagent volumes
         volume_spike_calc <- (200 * volume_cell_medium) / input$spike_input
@@ -307,7 +314,7 @@ server <- function(input, output) {
         validate_inputs()
         
         tagList(
-            h3(paste0("Transfection protocol (", Sys.Date(), ")")),
+            h4(paste0("Transfection protocol (", Sys.Date(), ")")),
             flextable::htmltools_value(ft())
         )
     })
