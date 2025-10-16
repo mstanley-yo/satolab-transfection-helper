@@ -175,15 +175,15 @@ server <- function(input, output) {
         data <- sample_data() %>%
             mutate(across(where(is.numeric), round_volumes)) %>%
             rename(
-                Sample = sample_id,
-                `S conc. (ng/µL)` = conc_spike,
-                `S volume (µL)` = volume_spike,
-                `HiBiT volume (µL)` = volume_hibit,
-                `Luc2 volume (µL)` = volume_luc2,
-                `Master mix volume (uL)` = volume_master,
+                Spike = sample_id,
+                `Spike conc. (ng/µL)` = conc_spike,
+                `Spike (µL)` = volume_spike,
+                `HiBiT (µL)` = volume_hibit,
+                `Luc2 (µL)` = volume_luc2,
+                `Master mix (uL)` = volume_master,
                 `Add OptiMEM (µL) ` = volume_optimem,
                 `Add TransIT (µL)` = volume_transit,
-                `Transfect to: (mL)` = volume_transfect
+                `Transfect to (mL)` = volume_transfect
             )
         
         # calculate master mix
@@ -252,7 +252,9 @@ server <- function(input, output) {
         )
         
         # process into flextable
-        set_flextable_defaults(fontname = "Open Sans")
+        set_flextable_defaults(fontname = "Helvetica")
+        set_flextable_defaults(font.size = 12)
+        set_flextable_defaults(word_wrap = FALSE)
         
         data %>%
             flextable() %>%
@@ -378,10 +380,11 @@ server <- function(input, output) {
         },
         content = function(file) {
             # format for docx. Increment integer to increase width
+            ft_width <- 9
             ft_docx <- ft() %>%
                 width(
-                    width = dim(.)$widths * 9 / (flextable_dim(.)$widths)
-                ) 
+                    width = dim(.)$widths * ft_width / (flextable_dim(.)$widths)
+                )
 
             # save as docx
             sect_properties <- prop_section(
@@ -402,10 +405,11 @@ server <- function(input, output) {
                     gutter = 0
                 )
             )
+            
             flextable::save_as_docx(
-                    ft_docx, 
-                    path = file, 
-                    pr_section = sect_properties
+                ft_docx, 
+                path = file, 
+                pr_section = sect_properties
             )
         }
     )
