@@ -175,9 +175,15 @@ server <- function(input, output) {
         data <- sample_data() %>%
             mutate(across(where(is.numeric), round_volumes)) %>%
             rename(
+<<<<<<< HEAD
                 Spike = sample_id,
                 `Spike conc. (ng/µL)` = conc_spike,
                 `Spike (µL)` = volume_spike,
+=======
+                Sample = sample_id,
+                `Spike conc. (ng/µL)` = conc_spike,
+                `S (µL)` = volume_spike,
+>>>>>>> refs/remotes/origin/main
                 `HiBiT (µL)` = volume_hibit,
                 `Luc2 (µL)` = volume_luc2,
                 `Master mix (uL)` = volume_master,
@@ -252,8 +258,13 @@ server <- function(input, output) {
         )
         
         # process into flextable
+<<<<<<< HEAD
         set_flextable_defaults(fontname = "Helvetica")
         set_flextable_defaults(font.size = 12)
+=======
+        set_flextable_defaults(fontname = "Arial")
+        set_flextable_defaults(font.size = 13)
+>>>>>>> refs/remotes/origin/main
         set_flextable_defaults(word_wrap = FALSE)
         
         data %>%
