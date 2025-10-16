@@ -25,6 +25,9 @@ ui <- page_fluid(
     theme = bs_theme(bootswatch = "flatly"),
     
     # title
+    tags$head(
+        tags$title("Pseudovirus Transfection Calculator")  
+    ),
     tags$h3(
         "Pseudovirus Transfection Calculator", 
         class = "text-primary", 
@@ -181,16 +184,56 @@ server <- function(input, output) {
                 `Transfect to: (mL)` = volume_transfect
             )
         
+        # calculate master mix
+        calc_master_mix <- function(sample_data, plate_input) {
+            
+            # safely calculate total for each reagent column
+            calc_total <- function(col) {
+                sample_data() %>%
+                    pull(col) %>%
+                    sum(na.rm = TRUE)
+            }
+            
+            # totals
+            total_tf_vol <- calc_total("volume_transfect")
+            total_hibit_vol <- calc_total("volume_hibit")
+            total_luc2_vol <- calc_total("volume_luc2")
+            
+            # total plates (avoid divide-by-zero)
+            tot_plates <- ifelse(
+                as.numeric(plate_input) == 0, 
+                0,
+                total_tf_vol / as.numeric(plate_input)
+            )
+            
+            # helper for master volume
+            calc_master <- function(total_vol) {
+                ifelse(
+                    tot_plates == 0, 
+                    0, 
+                    (total_vol / tot_plates) * (tot_plates + 0.5)
+                )
+            }
+            
+            # return named list of results
+            list(
+                total_tf_vol = total_tf_vol,
+                total_hibit_vol = total_hibit_vol,
+                total_luc2_vol = total_luc2_vol,
+                tot_plates = tot_plates,
+                hibit_master_vol = calc_master(total_hibit_vol),
+                luc2_master_vol = calc_master(total_luc2_vol)
+            )
+        }
+        
+        results <- calc_master_mix(sample_data, input$plate_input)
+        
         # master mix text
         mastermix_text <- paste(
             "To create a master mix, add",
-            round_volumes(
-                vols$volume_hibit_calc * (nrow(sample_data()) + 0.5)
-            ),
+            round_volumes(results$hibit_master_vol),
             "uL HiBiT plasmid and",
-            round_volumes(
-                vols$volume_luc2_calc * (nrow(sample_data()) + 0.5)
-            ),
+            round_volumes(results$luc2_master_vol),
             "uL Luc2 plasmid to a master mix tube,",
             "then add the indicated master mix volume to each tube.\n"
         )
@@ -207,6 +250,8 @@ server <- function(input, output) {
         )
         
         # process into flextable
+        set_flextable_defaults(fontname = "Open Sans")
+        
         data %>%
             flextable() %>%
             autofit() %>%
@@ -291,7 +336,7 @@ server <- function(input, output) {
             
             current <- sample_data()
             sample_data(rbind(current, new_row))
-    }) # observeEvent - add_sample
+    })
 
     # button - remove all samples
     observeEvent(input$remove_all_samples, {
@@ -307,7 +352,7 @@ server <- function(input, output) {
             volume_transit = numeric(),
             volume_transfect = numeric()
         ))
-    }) # observeEvent - remove_all_samples
+    })
     
     # render flextable as HTML widget
     output$pretty_output <- renderUI({
