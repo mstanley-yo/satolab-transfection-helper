@@ -150,18 +150,20 @@ server <- function(input, output) {
     }
     
     # setup reactive sample table
+    empty_table <- data.frame(
+        sample_id = character(),
+        conc_spike = numeric(),
+        volume_spike = numeric(),
+        volume_hibit = numeric(),
+        volume_luc2 = numeric(),
+        volume_master = numeric(),
+        volume_optimem = numeric(),
+        volume_transit = numeric(),
+        volume_transfect = numeric() 
+    )
+    
     sample_data <- reactiveVal(
-        data.frame(
-            sample_id = character(),
-            conc_spike = numeric(),
-            volume_spike = numeric(),
-            volume_hibit = numeric(),
-            volume_luc2 = numeric(),
-            volume_master = numeric(),
-            volume_optimem = numeric(),
-            volume_transit = numeric(),
-            volume_transfect = numeric() 
-        )
+        empty_table
     )
     
     # display reactive sample table as flextable
@@ -317,41 +319,46 @@ server <- function(input, output) {
     
     # button - add sample
     observeEvent(input$add_sample, {
-            validate_inputs()
-            
+        # calculate vols and consolidate into new row
+        vols <- calc_volumes()
+        new_row <- data.frame(
+            sample_id = input$sample_name_input,
+            conc_spike = input$spike_input,
+            volume_spike = vols$volume_spike_calc,
+            volume_hibit = vols$volume_hibit_calc,
+            volume_luc2 = vols$volume_luc2_calc,
+            volume_master = vols$volume_master_calc,
+            volume_optimem = vols$volume_optimem_calc,
+            volume_transit = vols$volume_transit_calc,
+            volume_transfect = vols$volume_cell_medium
+        )
+        
+        # bind to current
+        current <- sample_data()
+        sample_data(rbind(current, new_row))
+    })
+    
+    # button - remove all samples by setting sample_data to empty.
+    observeEvent(input$remove_all_samples, {
+        sample_data(empty_table)
+    })
+    
+    # Reactive re-calculation of hibit & luc2 volumes when inputs change
+    observeEvent({
+        list(input$hibit_input, input$luc2_input)
+    }, {
+        # Only recalc if there’s existing data
+        if (nrow(sample_data()) > 0) {
+            df <- sample_data()
             vols <- calc_volumes()
             
-            # consolidate into new row
-            new_row <- data.frame(
-                    sample_id = input$sample_name_input,
-                    conc_spike = input$spike_input,
-                    volume_spike = vols$volume_spike_calc,
-                    volume_hibit = vols$volume_hibit_calc,
-                    volume_luc2 = vols$volume_luc2_calc,
-                    volume_master = vols$volume_master_calc,
-                    volume_optimem = vols$volume_optimem_calc,
-                    volume_transit = vols$volume_transit_calc,
-                    volume_transfect = vols$volume_cell_medium
-            )
+            # Update hibit, luc2, and master mix volumes in existing table
+            df$volume_hibit <- (400 * df$volume_transfect) / input$hibit_input
+            df$volume_luc2  <- (400 * df$volume_transfect) / input$luc2_input
+            df$volume_master <- df$volume_hibit + df$volume_luc2
             
-            current <- sample_data()
-            sample_data(rbind(current, new_row))
-    })
-
-    # button - remove all samples
-    observeEvent(input$remove_all_samples, {
-        # set sample_data to empty.
-        sample_data(data.frame(
-            sample_id = character(),
-            conc_spike = numeric(),
-            volume_spike = numeric(),
-            volume_hibit = numeric(),
-            volume_luc2 = numeric(),
-            volume_master = numeric(),
-            volume_optimem = numeric(),
-            volume_transit = numeric(),
-            volume_transfect = numeric()
-        ))
+            sample_data(df)
+        }
     })
     
     # render flextable as HTML widget
@@ -370,11 +377,11 @@ server <- function(input, output) {
             paste0("transfection_table_", Sys.Date(), ".docx")
         },
         content = function(file) {
-            # format for docx.
-            ft_width <- 9 # increase to extend the width of the flextable
+            # format for docx. Increment integer to increase width
             ft_docx <- ft() %>%
-                width(width = dim(.)$widths * ft_width /
-                          (flextable_dim(.)$widths)) 
+                width(
+                    width = dim(.)$widths * 9 / (flextable_dim(.)$widths)
+                ) 
 
             # save as docx
             sect_properties <- prop_section(
