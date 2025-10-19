@@ -221,7 +221,7 @@ server <- function(input, output) {
                 `Opti-MEM\n(µL) ` = volume_optimem,
                 `TransIT\n(µL)` = volume_transit,
                 `Transfect to (mL)` = volume_transfect,
-                `Transfect to` = plate_count
+                `Transfect\nto` = plate_count
             ) %>%
             select(-`Transfect to (mL)`)
         
@@ -291,7 +291,7 @@ server <- function(input, output) {
         )
         
         # process into flextable
-        set_flextable_defaults(fontname = "Helvetica")
+        set_flextable_defaults(fontname = "Arial")
         set_flextable_defaults(font.size = 13)
         set_flextable_defaults(word_wrap = FALSE)
         
