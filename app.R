@@ -10,15 +10,6 @@ library(officer)
 # define variables
 github_link <- "https://github.com/mstanley-yo/satolab-transfection-helper"
 
-# function to round volumes based on if using p20, p200, or p1000
-round_volumes <- function(vol) {
-    case_when(
-        vol < 20 ~ round(vol, 2),
-        vol > 200 ~ round(vol),
-        .default = round(vol, 1)
-    )
-}
-
 # ui function #####
 ui <- page_fluid(
     # theme
@@ -98,7 +89,7 @@ ui <- page_fluid(
         ),
         
         mainPanel(
-            uiOutput("pretty_output"),
+            uiOutput("table_output"),
             br(),
             downloadButton("download_docx", "Download table as .docx"),
             br(),
@@ -159,12 +150,58 @@ server <- function(input, output) {
         volume_master = numeric(),
         volume_optimem = numeric(),
         volume_transit = numeric(),
-        volume_transfect = numeric() 
+        volume_transfect = numeric(),
+        plate_count = character()
     )
     
     sample_data <- reactiveVal(
         empty_table
     )
+    
+    # function to round volumes based on if using p20, p200, or p1000
+    round_volumes <- function(vol) {
+        case_when(
+            vol < 20 ~ round(vol, 2),
+            vol > 200 ~ round(vol),
+            .default = round(vol, 1)
+        )
+    }
+    
+    # Reactive expression for calculated volumes
+    calc_volumes <- reactive({
+        validate_inputs()
+        
+        # Calculate total cell medium volume
+        volume_cell_medium <- as.numeric(input$plate_input) * input$num_input
+        plate_count <- paste(
+            input$num_input,
+            case_when(
+                input$plate_input == 2 ~ "6-well wells",
+                input$plate_input == 1 ~ "12-well wells", 
+                input$plate_input == 20 ~ "15-cm dishes"
+            )
+        )
+        
+        # Calculate reagent volumes
+        volume_spike_calc <- (200 * volume_cell_medium) / input$spike_input
+        volume_hibit_calc <- (400 * volume_cell_medium) / input$hibit_input
+        volume_luc2_calc <- (400 * volume_cell_medium) / input$luc2_input
+        volume_optimem_calc <- volume_cell_medium * 100
+        volume_transit_calc <- volume_cell_medium * 3
+        volume_master_calc <- volume_hibit_calc + volume_luc2_calc
+        
+        # Return as named list
+        list(
+            volume_cell_medium = volume_cell_medium,
+            volume_spike_calc = volume_spike_calc,
+            volume_hibit_calc = volume_hibit_calc,
+            volume_luc2_calc = volume_luc2_calc,
+            volume_master_calc = volume_master_calc,
+            volume_optimem_calc = volume_optimem_calc,
+            volume_transit_calc = volume_transit_calc,
+            plate_count = plate_count
+        )
+    })
     
     # display reactive sample table as flextable
     ft <- reactive({
@@ -176,15 +213,17 @@ server <- function(input, output) {
             mutate(across(where(is.numeric), round_volumes)) %>%
             rename(
                 Spike = sample_id,
-                `Spike conc. (ng/µL)` = conc_spike,
-                `Spike (µL)` = volume_spike,
-                `HiBiT (µL)` = volume_hibit,
-                `Luc2 (µL)` = volume_luc2,
-                `Master mix (uL)` = volume_master,
-                `Add OptiMEM (µL) ` = volume_optimem,
-                `Add TransIT (µL)` = volume_transit,
-                `Transfect to (mL)` = volume_transfect
-            )
+                `S conc.\n(ng/µL)` = conc_spike,
+                `S vol.\n(µL)` = volume_spike,
+                `HiBiT\n(µL)` = volume_hibit,
+                `Luc2\n(µL)` = volume_luc2,
+                `Master mix\n(µL)` = volume_master,
+                `Opti-MEM\n(µL) ` = volume_optimem,
+                `TransIT\n(µL)` = volume_transit,
+                `Transfect to (mL)` = volume_transfect,
+                `Transfect to` = plate_count
+            ) %>%
+            select(-`Transfect to (mL)`)
         
         # calculate master mix
         calc_master_mix <- function(sample_data, plate_input) {
@@ -244,16 +283,16 @@ server <- function(input, output) {
         protocol_text <- paste(
             "Protocol:\n",
             "1. Add calculated volumes of DNA to a sterile tube.\n",
-            "2. Add calculated volume of Opti-Mem.\n",
+            "2. Add calculated volume of Opti-MEM.\n",
             "3. Add calculated volume of Trans-IT.\n",
             "4. Incubate samples for 15 minutes at room temperature.\n",
-            "5. Add sample volume equivalent to 10% of cell medium volume. 
-            (For example, add 2 mL to each 20 mL plate.)"
+            "5. Add sample volume equivalent to 10% of cell medium volume.", 
+            "(For example, add 2 mL to each 20 mL plate.)"
         )
         
         # process into flextable
         set_flextable_defaults(fontname = "Helvetica")
-        set_flextable_defaults(font.size = 12)
+        set_flextable_defaults(font.size = 13)
         set_flextable_defaults(word_wrap = FALSE)
         
         data %>%
@@ -292,33 +331,6 @@ server <- function(input, output) {
             align(align = "center", part = "body")
     })
     
-    # Reactive expression for calculated volumes
-    calc_volumes <- reactive({
-        validate_inputs()
-        
-        # Calculate total cell medium volume
-        volume_cell_medium <- as.numeric(input$plate_input) * input$num_input
-        
-        # Calculate reagent volumes
-        volume_spike_calc <- (200 * volume_cell_medium) / input$spike_input
-        volume_hibit_calc <- (400 * volume_cell_medium) / input$hibit_input
-        volume_luc2_calc <- (400 * volume_cell_medium) / input$luc2_input
-        volume_optimem_calc <- volume_cell_medium * 100
-        volume_transit_calc <- volume_cell_medium * 3
-        volume_master_calc <- volume_hibit_calc + volume_luc2_calc
-        
-        # Return as named list
-        list(
-            volume_cell_medium = volume_cell_medium,
-            volume_spike_calc = volume_spike_calc,
-            volume_hibit_calc = volume_hibit_calc,
-            volume_luc2_calc = volume_luc2_calc,
-            volume_master_calc = volume_master_calc,
-            volume_optimem_calc = volume_optimem_calc,
-            volume_transit_calc = volume_transit_calc
-        )
-    })
-    
     # button - add sample
     observeEvent(input$add_sample, {
         # calculate vols and consolidate into new row
@@ -332,7 +344,8 @@ server <- function(input, output) {
             volume_master = vols$volume_master_calc,
             volume_optimem = vols$volume_optimem_calc,
             volume_transit = vols$volume_transit_calc,
-            volume_transfect = vols$volume_cell_medium
+            volume_transfect = vols$volume_cell_medium,
+            plate_count = vols$plate_count
         )
         
         # bind to current
@@ -364,11 +377,11 @@ server <- function(input, output) {
     })
     
     # render flextable as HTML widget
-    output$pretty_output <- renderUI({
+    output$table_output <- renderUI({
         validate_inputs()
         
-        tagList(
-            h4(paste0("Transfection protocol (", Sys.Date(), ")")),
+        tags$div(
+            style = "margin-left: 0; margin-right: auto; width: fit-content;",
             flextable::htmltools_value(ft())
         )
     })
@@ -380,7 +393,7 @@ server <- function(input, output) {
         },
         content = function(file) {
             # format for docx. Increment integer to increase width
-            ft_width <- 9
+            ft_width <- 9.2
             ft_docx <- ft() %>%
                 width(
                     width = dim(.)$widths * ft_width / (flextable_dim(.)$widths)
