@@ -293,7 +293,7 @@ server <- function(input, output) {
         # process into flextable
         set_flextable_defaults(
             font.family = "Helvetica",
-            font.size = 13,
+            font.size = 14,
             word_wrap = FALSE
         )
         
@@ -395,21 +395,20 @@ server <- function(input, output) {
         },
         content = function(file) {
             # format for docx. Increment integer to increase width
-            ft_width <- 9.2
+            ft_width <- 10.5
             ft_docx <- ft() %>%
                 width(
                     width = dim(.)$widths * ft_width / (flextable_dim(.)$widths)
                 )
 
-            # save as docx
+            # format to A4 landscape with narrow margins
             sect_properties <- prop_section(
                 page_size = page_size(
                     orient = "landscape",
-                    width = 7, height = 10
+                    width = 11.69, 
+                    height = 8.27
                 ),
                 type = "continuous",
-                
-                # make margins narrow
                 page_margins = page_mar(
                     top = 0.5, 
                     right = 0.5, 
