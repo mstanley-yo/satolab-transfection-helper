@@ -212,7 +212,7 @@ server <- function(input, output) {
         data <- sample_data() %>%
             mutate(across(where(is.numeric), round_volumes)) %>%
             rename(
-                Spike = sample_id,
+                S = sample_id,
                 `S conc.\n(ng/µL)` = conc_spike,
                 `S vol.\n(µL)` = volume_spike,
                 `HiBiT\n(µL)` = volume_hibit,
@@ -287,13 +287,15 @@ server <- function(input, output) {
             "3. Add calculated volume of Trans-IT.\n",
             "4. Incubate samples for 15 minutes at room temperature.\n",
             "5. Add sample volume equivalent to 10% of cell medium volume.", 
-            "(For example, add 2 mL to each 20 mL plate.)"
+            "(For example, add 2 mL to each 20 mL dish.)"
         )
         
         # process into flextable
-        set_flextable_defaults(fontname = "Arial")
-        set_flextable_defaults(font.size = 13)
-        set_flextable_defaults(word_wrap = FALSE)
+        set_flextable_defaults(
+            font.family = "Helvetica",
+            font.size = 13,
+            word_wrap = FALSE
+        )
         
         data %>%
             flextable() %>%
