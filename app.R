@@ -2,8 +2,8 @@
 # Load R packages
 library(shiny)
 library(bslib)
-library(shinythemes)
-library(tidyverse)
+library(dplyr)
+library(tidyr)
 library(flextable)
 library(officer)
 
@@ -210,7 +210,6 @@ server <- function(input, output) {
         
         # rename column headers and round values
         data <- sample_data() %>%
-            mutate(across(where(is.numeric), round_volumes)) %>%
             rename(
                 S = sample_id,
                 `S conc.\n(ng/µL)` = conc_spike,
@@ -223,6 +222,7 @@ server <- function(input, output) {
                 `Transfect to (mL)` = volume_transfect,
                 `Transfect\nto` = plate_count
             ) %>%
+            mutate(across(contains("(µL)"), round_volumes)) %>%
             select(-`Transfect to (mL)`)
         
         # calculate master mix
@@ -271,7 +271,7 @@ server <- function(input, output) {
         
         # master mix text
         mastermix_text <- paste(
-            "To create a master mix, add",
+            "To create a HiBiT + Luc2 master mix, add",
             round_volumes(results$hibit_master_vol),
             "uL HiBiT plasmid and",
             round_volumes(results$luc2_master_vol),
