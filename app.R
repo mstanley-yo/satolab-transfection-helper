@@ -7,8 +7,12 @@ library(tidyr)
 library(flextable)
 library(officer)
 
-# define variables
-github_link <- "https://github.com/mstanley-yo/satolab-transfection-helper"
+# clickable github link + icon
+github_link <- tags$a(
+    shiny::icon("github"), "GitHub",
+    href = "https://github.com/mstanley-yo/satolab-transfection-helper",
+    target = "_blank"
+)
 
 # ui function #####
 ui <- page_fluid(
@@ -26,40 +30,45 @@ ui <- page_fluid(
     ),
     
     # sidebar layout
-    sidebarLayout(
-        sidebarPanel(
-            textInput(
-                "sample_name_input",
-                "Sample name", 
-                value = NA
+    layout_columns(
+        col_widths = c(4, 8),
+        card(
+            card_header("Add Transfection Sample"),
+            layout_columns(
+                col_widths = c(12, 12),
+                textInput(
+                    "sample_name_input",
+                    "Spike", 
+                    value = NA
+                ),
+                numericInput(
+                    "spike_input", 
+                    "Spike concentration (ng/µL)", 
+                    value = NA, 
+                    min = 0
+                ),
+                numericInput(
+                    "hibit_input", 
+                    "HiBiT concentration (ng/µL)", 
+                    value = NA, 
+                    min = 0
+                ),
+                numericInput(
+                    "luc2_input", 
+                    "Luc2 concentration (ng/µL)", 
+                    value = NA, 
+                    min = 0
+                ),
+                
             ),
-            numericInput(
-                "spike_input", 
-                "Spike concentration (ng/µL)", 
-                value = NA, 
-                min = 0
-            ),
-            numericInput(
-                "hibit_input", 
-                "HiBiT concentration (ng/µL)", 
-                value = NA, 
-                min = 0
-            ),
-            numericInput(
-                "luc2_input", 
-                "Luc2 concentration (ng/µL)", 
-                value = NA, 
-                min = 0
-            ),
-            
             layout_columns(
                 radioButtons(
                     "plate_input",
                     "Plate/Dish type",
                     choices = list(
-                        "6-well (2 mL)" = 2, 
-                        "12-well (1 mL)" = 1, 
-                        "15 cm (20 mL)" = 20
+                        "6-well (per well, 2 mL)" = 2,
+                        "12-well (per well, 1 mL)" = 1,
+                        "15 cm dish (20 mL)" = 20
                     ),
                     selected = 20
                 ),
@@ -70,16 +79,12 @@ ui <- page_fluid(
                     min = 0
                 )
             ),
-            
-            br(),
             actionButton(
                 "add_sample", 
                 "Add Sample", 
                 icon = icon("plus"),
                 class = "btn-primary"
             ),
-            br(), 
-            br(),
             actionButton(
                 "remove_all_samples", 
                 "Remove All Samples", 
@@ -88,21 +93,12 @@ ui <- page_fluid(
             )
         ),
         
-        mainPanel(
+        card(
+            card_header("Transfection Table & Protocol"),
             uiOutput("table_output"),
-            br(),
             downloadButton("download_docx", "Download table as .docx"),
-            br(),
-            br(),
             p("Written in R Shiny by Maximilian Stanley Yo."),
-            p(
-                "Follow development here: ",
-                tags$a(
-                    "GitHub Repository", 
-                    href = github_link,
-                    target = "_blank"
-                )
-            )
+            github_link
         )
     )
 )
@@ -120,7 +116,7 @@ server <- function(input, output) {
         validate(
             need(
                 input$sample_name_input != "", 
-                "Please enter a sample name."
+                "Please enter Spike sample name."
             ),
             need(
                 !is.na(input$spike_input), 
