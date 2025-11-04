@@ -2,6 +2,7 @@
 # Load R packages
 library(shiny)
 library(bslib)
+library(shinyvalidate)
 library(dplyr)
 library(tidyr)
 library(flextable)
@@ -105,7 +106,6 @@ ui <- page_fluid(
 
 # server function #####
 server <- function(input, output) {
-
     validate_inputs <- function() {
         # display anyway if sample table is not empty
         if (nrow(sample_data()) > 0) {
@@ -135,6 +135,16 @@ server <- function(input, output) {
             )
         )
     }
+    
+    # warn if num_input is >20, as it won't fit in a 50 mL tube.
+    iv <- InputValidator$new()
+    iv$add_rule("num_input", sv_optional())
+    iv$add_rule("num_input", function(value) {
+        if (value > 20) {
+            "Volume may exceed 50 mL tube capacity. Consider splitting."
+        }
+    })
+    iv$enable()
     
     # setup reactive sample table
     empty_table <- data.frame(
