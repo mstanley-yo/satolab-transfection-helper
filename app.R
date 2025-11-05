@@ -1,5 +1,3 @@
-# satolab-transfection-helper
-# Load R packages
 library(shiny)
 library(bslib)
 library(shinyvalidate)
@@ -16,91 +14,90 @@ github_link <- tags$a(
 )
 
 # ui function #####
-ui <- page_fluid(
-    # theme
+ui <- page_navbar(
     theme = bs_theme(bootswatch = "flatly"),
+    title = "Pseudovirus Transfection Calculator",
     
-    # title
-    tags$head(
-        tags$title("Pseudovirus Transfection Calculator")  
-    ),
-    tags$h3(
-        "Pseudovirus Transfection Calculator", 
-        class = "text-primary", 
-        style = "margin-top: 15px;margin-bottom: 15px;"
-    ),
-    
-    # sidebar layout
-    layout_columns(
-        col_widths = c(4, 8),
-        card(
-            card_header("Add Transfection Sample"),
-            layout_columns(
-                col_widths = c(12, 12),
-                textInput(
-                    "sample_name_input",
-                    "Spike", 
-                    value = NA
-                ),
-                numericInput(
-                    "spike_input", 
-                    "Spike concentration (ng/µL)", 
-                    value = NA, 
-                    min = 0
-                ),
-                numericInput(
-                    "hibit_input", 
-                    "HiBiT concentration (ng/µL)", 
-                    value = NA, 
-                    min = 0
-                ),
-                numericInput(
-                    "luc2_input", 
-                    "Luc2 concentration (ng/µL)", 
-                    value = NA, 
-                    min = 0
-                ),
-                
-            ),
-            layout_columns(
-                radioButtons(
-                    "plate_input",
-                    "Plate/Dish type",
-                    choices = list(
-                        "6-well (per well, 2 mL)" = 2,
-                        "12-well (per well, 1 mL)" = 1,
-                        "15 cm dish (20 mL)" = 20
+    # calculator panel
+    nav_panel(
+        "Calculator",
+        layout_columns(
+            col_widths = c(4, 8),
+            card(
+                card_header("Add Transfection Sample"),
+                layout_columns(
+                    col_widths = c(12, 12),
+                    textInput(
+                        "sample_name",
+                        "Spike", 
+                        value = NA
                     ),
-                    selected = 20
+                    numericInput(
+                        "spike_input", 
+                        "Spike concentration (ng/µL)", 
+                        value = NA, 
+                        min = 0
+                    ),
+                    numericInput(
+                        "hibit_input", 
+                        "HiBiT concentration (ng/µL)", 
+                        value = NA, 
+                        min = 0
+                    ),
+                    numericInput(
+                        "luc2_input", 
+                        "Luc2 concentration (ng/µL)", 
+                        value = NA, 
+                        min = 0
+                    ),
+                    
                 ),
-                numericInput(
-                    "num_input", 
-                    "Number to transfect", 
-                    value = NA, 
-                    min = 0
+                layout_columns(
+                    radioButtons(
+                        "plate_input",
+                        "Plate/Dish type",
+                        choices = list(
+                            "6-well (per well, 2 mL)" = 2,
+                            "12-well (per well, 1 mL)" = 1,
+                            "15 cm dish (20 mL)" = 20
+                        ),
+                        selected = 20
+                    ),
+                    numericInput(
+                        "num_input", 
+                        "Number to transfect", 
+                        value = NA, 
+                        min = 0
+                    )
+                ),
+                actionButton(
+                    "add_sample", 
+                    "Add Sample", 
+                    icon = icon("plus"),
+                    class = "btn-primary"
+                ),
+                actionButton(
+                    "remove_all_samples", 
+                    "Remove All Samples", 
+                    icon = icon("trash"),
+                    class = "btn-danger"
                 )
             ),
-            actionButton(
-                "add_sample", 
-                "Add Sample", 
-                icon = icon("plus"),
-                class = "btn-primary"
-            ),
-            actionButton(
-                "remove_all_samples", 
-                "Remove All Samples", 
-                icon = icon("trash"),
-                class = "btn-danger"
+            
+            card(
+                card_header("Transfection Table & Protocol"),
+                uiOutput("table_output"),
+                downloadButton("download_docx", "Download table as .docx"),
+                p("Written in R Shiny by Maximilian Stanley Yo."),
+                github_link
             )
-        ),
-        
-        card(
-            card_header("Transfection Table & Protocol"),
-            uiOutput("table_output"),
-            downloadButton("download_docx", "Download table as .docx"),
-            p("Written in R Shiny by Maximilian Stanley Yo."),
-            github_link
         )
+    ),
+    
+    # settings panel
+    nav_panel(
+        "Settings",
+        numericInput("mm_extra", "Extra master mix (plates)", "0.5", min = 0)
     )
 )
 
@@ -112,36 +109,29 @@ server <- function(input, output) {
                 return(invisible(TRUE))
         }
         
-        # else validate inputs
+        # else validate and require inputs
         validate(
-            need(
-                input$sample_name_input != "", 
-                "Please enter Spike sample name."
-            ),
-            need(
-                !is.na(input$spike_input), 
-                "Please enter Spike concentration."
-            ),
-            need(
-                !is.na(input$hibit_input), 
-                "Please enter HiBiT concentration."),
-            need(
-                !is.na(input$luc2_input), 
-                "Please enter Luc2 concentration."
-            ),
-            need(
-                !is.na(input$num_input), 
-                "Please enter the number of plates to transfect."
-            )
+            need(input$sample_name, "Please enter sample name."),
+            need(input$spike_input, "Please enter Spike conc."),
+            need(input$hibit_input, "Please enter HiBiT conc."),
+            need(input$luc2_input, "Please enter Luc2 conc."),
+            need(input$num_input, "Please enter number of plates.")
         )
+        
     }
     
-    # warn if num_input is >20, as it won't fit in a 50 mL tube.
+    # validate inputs through warnings
     iv <- InputValidator$new()
+    iv$add_rule("mm_extra", sv_required())
+    iv$add_rule("mm_extra", function(value) {
+        if (value < 0) {
+            "Extra master mix (plates) should be at least 0."
+        }
+    })
     iv$add_rule("num_input", sv_optional())
     iv$add_rule("num_input", function(value) {
         if (value > 20) {
-            "Volume may exceed 50 mL tube capacity. Consider splitting."
+            "Volume may exceed 50 mL tube capacity. Should keep under 21."
         }
     })
     iv$enable()
@@ -255,10 +245,12 @@ server <- function(input, output) {
             
             # helper for master volume
             calc_master <- function(total_vol) {
+                mm_extra <- ifelse(input$mm_extra < 0, 0, input$mm_extra)
+                
                 ifelse(
                     tot_plates == 0, 
                     0, 
-                    (total_vol / tot_plates) * (tot_plates + 0.5)
+                    (total_vol / tot_plates) * (tot_plates + mm_extra)
                 )
             }
             
@@ -344,7 +336,7 @@ server <- function(input, output) {
         # calculate vols and consolidate into new row
         vols <- calc_volumes()
         new_row <- data.frame(
-            sample_id = input$sample_name_input,
+            sample_id = input$sample_name,
             conc_spike = input$spike_input,
             volume_spike = vols$volume_spike_calc,
             volume_hibit = vols$volume_hibit_calc,
@@ -401,10 +393,9 @@ server <- function(input, output) {
         },
         content = function(file) {
             # format for docx. Increment integer to increase width
-            ft_width <- 10.5
             ft_docx <- ft() %>%
                 width(
-                    width = dim(.)$widths * ft_width / (flextable_dim(.)$widths)
+                    width = dim(.)$widths * 10.5 / (flextable_dim(.)$widths)
                 )
 
             # format to A4 landscape with narrow margins
