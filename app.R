@@ -6,14 +6,13 @@ library(tidyr)
 library(flextable)
 library(officer)
 
-# clickable github link + icon
+##### UI Function #####
 github_link <- tags$a(
     shiny::icon("github"), "GitHub",
     href = "https://github.com/mstanley-yo/satolab-transfection-helper",
     target = "_blank"
 )
 
-# ui function #####
 ui <- page_navbar(
     theme = bs_theme(bootswatch = "flatly"),
     title = "Pseudovirus Transfection Calculator",
@@ -105,11 +104,11 @@ ui <- page_navbar(
             "Extra HiBiT/Luc2 master mix (plates)", 
             "0.5", 
             min = 0
-        ),
+        )
     )
 )
 
-# server function #####
+##### Server Function #####
 server <- function(input, output) {
     validate_inputs <- function() {
         # display anyway if sample table is not empty
@@ -161,7 +160,7 @@ server <- function(input, output) {
         empty_table
     )
     
-    # function to round volumes based on if using p20, p200, or p1000
+    # Function to round volumes based on if using p20, p200, or p1000
     round_volumes <- function(vol) {
         case_when(
             vol < 20 ~ round(vol, 2),
@@ -189,7 +188,7 @@ server <- function(input, output) {
         volume_spike_calc <- (200 * volume_cell_medium) / input$spike_input
         volume_hibit_calc <- (400 * volume_cell_medium) / input$hibit_input
         volume_luc2_calc <- (400 * volume_cell_medium) / input$luc2_input
-        volume_optimem_calc <- volume_cell_medium * 100
+        volume_optimem_calc <- volume_cell_medium * 0.1
         volume_transit_calc <- volume_cell_medium * 3
         volume_master_calc <- volume_hibit_calc + volume_luc2_calc
         
@@ -208,9 +207,6 @@ server <- function(input, output) {
     
     # display reactive sample table as flextable
     ft <- reactive({
-        # calculate volumes
-        vols <- calc_volumes()
-        
         # rename column headers and round values
         data <- sample_data() %>%
             rename(
@@ -220,7 +216,7 @@ server <- function(input, output) {
                 `HiBiT\n(µL)` = volume_hibit,
                 `Luc2\n(µL)` = volume_luc2,
                 `Master mix\n(µL)` = volume_master,
-                `Opti-MEM\n(µL) ` = volume_optimem,
+                `Opti-MEM\n(mL) ` = volume_optimem,
                 `TransIT\n(µL)` = volume_transit,
                 `Transfect to (mL)` = volume_transfect,
                 `Transfect\nto` = plate_count
@@ -292,18 +288,7 @@ server <- function(input, output) {
             data <- select(data, -`HiBiT\n(µL)`, -`Luc2\n(µL)`)
         }
         
-        # Protocol text
-        protocol_text <- paste(
-            "Protocol:\n",
-            "1. Add calculated volumes of DNA to a sterile tube.\n",
-            "2. Add calculated volume of Opti-MEM.\n",
-            "3. Add calculated volume of Trans-IT.\n",
-            "4. Incubate samples for 15 minutes at room temperature.\n",
-            "5. Add sample volume equivalent to 10% of cell medium volume.", 
-            "(For example, add 2 mL to each 20 mL dish.)"
-        )
-        
-        # process into flextable
+        # Process into flextable
         set_flextable_defaults(
             font.family = "Helvetica",
             font.size = 14,
@@ -332,20 +317,43 @@ server <- function(input, output) {
                 add_footer_lines(values = as_paragraph(mastermix_text))
         }
         
-        # always add protocol_text
+        # Protocol text
+        protocol_text <- paste(
+            "Protocol:\n",
+            "1. Add calculated volumes of DNA to a sterile tube.\n",
+            "2. Add calculated volume of Opti-MEM.\n",
+            "3. Add calculated volume of Trans-IT.\n",
+            "4. Incubate samples for 15 minutes at room temperature.\n",
+            "5. Add sample volume equivalent to 10% of cell medium volume.", 
+            "(For example, add 2 mL to each 20 mL dish.)"
+        )
+        
         flextable <- flextable %>%
-            add_footer_lines(values = as_paragraph(protocol_text)) %>%
+            add_footer_lines(values = as_paragraph(protocol_text))
+        
+        # Format
+        cols_red <- intersect(
+            colnames(data), 
+            c("S vol.\n(µL)", "HiBiT\n(µL)", "Luc2\n(µL)")
+        )
+        cols_blue <- intersect(
+            colnames(data), 
+            c("Master mix\n(µL)")
+        )
+        cols_bold <- c(cols_red, cols_blue)
+        
+        flextable <- flextable %>%
             bold(bold = TRUE, part = "header") %>%
-            bold(j = 3:6, bold = TRUE, part = "body") %>%
-            color(j = 3:5, color = "red", part = "body") %>%
-            color(j = 6, color = "blue", part = "body") %>%
+            bold(j = cols_bold, bold = TRUE, part = "body") %>%
+            color(j = cols_red, color = "red", part = "body") %>%
+            color(j = cols_blue, color = "blue", part = "body") %>%
             align(align = "center", part = "header") %>%
             align(align = "center", part = "body")
         
         flextable
     })
     
-    # Button - add sample
+    # Button - Add sample
     observeEvent(input$add_sample, {
         # calculate vols and consolidate into new row
         vols <- calc_volumes()
@@ -367,7 +375,7 @@ server <- function(input, output) {
         sample_data(rbind(current, new_row))
     })
     
-    # button - remove all samples by setting sample_data to empty.
+    # Button - remove all samples by setting sample_data to empty.
     observeEvent(input$remove_all_samples, {
         sample_data(empty_table)
     })
@@ -441,5 +449,5 @@ server <- function(input, output) {
 }
 
 
-# Create Shiny object #####
+##### Create Shiny object #####
 shinyApp(ui = ui, server = server)
