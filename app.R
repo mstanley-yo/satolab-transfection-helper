@@ -97,7 +97,15 @@ ui <- page_navbar(
     # settings panel
     nav_panel(
         "Settings",
-        numericInput("mm_extra", "Extra master mix (plates)", "0.5", min = 0)
+        h4("Master mix settings"),
+        checkboxInput("show_hibit_luc2", "Display HiBiT/Luc2 volumes", TRUE),
+        checkboxInput("show_mm", "Combine HiBiT/Luc2 as master mix", TRUE),
+        numericInput(
+            "mm_extra", 
+            "Extra HiBiT/Luc2 master mix (plates)", 
+            "0.5", 
+            min = 0
+        ),
     )
 )
 
@@ -112,12 +120,11 @@ server <- function(input, output) {
         # else validate and require inputs
         validate(
             need(input$sample_name, "Please enter sample name."),
-            need(input$spike_input, "Please enter Spike conc."),
-            need(input$hibit_input, "Please enter HiBiT conc."),
-            need(input$luc2_input, "Please enter Luc2 conc."),
+            need(input$spike_input, "Please enter Spike concentration."),
+            need(input$hibit_input, "Please enter HiBiT concentration."),
+            need(input$luc2_input, "Please enter Luc2 concentration."),
             need(input$num_input, "Please enter number of plates.")
         )
-        
     }
     
     # validate inputs through warnings
@@ -221,7 +228,7 @@ server <- function(input, output) {
             mutate(across(contains("(µL)"), round_volumes)) %>%
             select(-`Transfect to (mL)`)
         
-        # calculate master mix
+        # Function to calculate master mix
         calc_master_mix <- function(sample_data, plate_input) {
             
             # safely calculate total for each reagent column
@@ -265,19 +272,27 @@ server <- function(input, output) {
             )
         }
         
-        results <- calc_master_mix(sample_data, input$plate_input)
+        # Generate master mix text only if needed
+        if (input$show_mm) {
+            results <- calc_master_mix(sample_data, input$plate_input)
+            mastermix_text <- paste(
+                "To create a HiBiT + Luc2 master mix, add",
+                round_volumes(results$hibit_master_vol),
+                "uL HiBiT plasmid and",
+                round_volumes(results$luc2_master_vol),
+                "uL Luc2 plasmid to a master mix tube,",
+                "then add the indicated master mix volume to each tube.\n"
+            )
+        } else {
+            data <- select(data, -`Master mix\n(µL)`)
+        }
         
-        # master mix text
-        mastermix_text <- paste(
-            "To create a HiBiT + Luc2 master mix, add",
-            round_volumes(results$hibit_master_vol),
-            "uL HiBiT plasmid and",
-            round_volumes(results$luc2_master_vol),
-            "uL Luc2 plasmid to a master mix tube,",
-            "then add the indicated master mix volume to each tube.\n"
-        )
+        # Remove HiBiT and Luc2 volumes if turned off in settings
+        if (!input$show_hibit_luc2) {
+            data <- select(data, -`HiBiT\n(µL)`, -`Luc2\n(µL)`)
+        }
         
-        # protocol text
+        # Protocol text
         protocol_text <- paste(
             "Protocol:\n",
             "1. Add calculated volumes of DNA to a sterile tube.\n",
@@ -295,43 +310,42 @@ server <- function(input, output) {
             word_wrap = FALSE
         )
         
-        data %>%
+        flextable <- data %>%
             flextable() %>%
             autofit() %>%
             add_header_lines(
                 values = paste0(
-                    "Pseudovirus transfection (",
-                    Sys.Date(), 
-                    ") dilution table"
+                    "Pseudovirus transfection table (", Sys.Date(), ")"
                 )
             ) %>%
             add_footer_lines(
                 values = as_paragraph(
-                    paste(
-                        "HiBiT plasmid concentration:", 
-                        input$hibit_input, 
-                        "ng/µL\n"
-                    ),
-                    paste(
-                        "Luc2 plasmid concentration:", 
-                        input$luc2_input, 
-                        "ng/µL\n"
-                    ),
+                    paste("HiBiT concentration:", input$hibit_input, "ng/µL"),
                     "\n",
-                    mastermix_text,
-                    "\n",
-                    protocol_text
+                    paste("Luc2 concentration:", input$luc2_input, "ng/µL")
                 )
-            ) %>%
+            )
+        
+        # conditionally add mastermix_text
+        if (input$show_mm) {
+            flextable <- flextable %>%
+                add_footer_lines(values = as_paragraph(mastermix_text))
+        }
+        
+        # always add protocol_text
+        flextable <- flextable %>%
+            add_footer_lines(values = as_paragraph(protocol_text)) %>%
             bold(bold = TRUE, part = "header") %>%
             bold(j = 3:6, bold = TRUE, part = "body") %>%
             color(j = 3:5, color = "red", part = "body") %>%
             color(j = 6, color = "blue", part = "body") %>%
             align(align = "center", part = "header") %>%
             align(align = "center", part = "body")
+        
+        flextable
     })
     
-    # button - add sample
+    # Button - add sample
     observeEvent(input$add_sample, {
         # calculate vols and consolidate into new row
         vols <- calc_volumes()
